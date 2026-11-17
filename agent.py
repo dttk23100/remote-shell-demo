@@ -41,25 +41,29 @@ def allowed(cmd: str) -> bool:
 
 def fetch_raw(file: str) -> str:
     url = f"https://gist.githubusercontent.com/{OWNER}/{GIST_ID}/raw/{file}?t={time.time_ns()}"
-    req = urllib.request.Request(url, headers={"User-Agent": "remote-shell-demo-agent"})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return r.read().decode("utf-8", "replace")
+    return subprocess.check_output(
+        ["/usr/bin/curl", "-sS", "--max-time", "15", "-A", "remote-shell-demo-agent", url],
+        text=True,
+    )
 
 def patch(files: dict) -> None:
-    body = json.dumps({"files": files}).encode("utf-8")
-    req = urllib.request.Request(
-        f"https://api.github.com/gists/{GIST_ID}",
-        data=body,
-        method="PATCH",
-        headers={
-            "Authorization": f"Bearer {TOKEN}",
-            "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json",
-            "User-Agent": "remote-shell-demo-agent",
-        },
+    body = json.dumps({"files": files})
+    p = subprocess.run(
+        [
+            "/usr/bin/curl", "-sS", "--max-time", "15", "-X", "PATCH",
+            "-H", f"Authorization: Bearer {TOKEN}",
+            "-H", "Accept: application/vnd.github+json",
+            "-H", "Content-Type: application/json",
+            "-A", "remote-shell-demo-agent",
+            "--data-binary", "@-",
+            f"https://api.github.com/gists/{GIST_ID}",
+        ],
+        input=body,
+        text=True,
+        capture_output=True,
     )
-    with urllib.request.urlopen(req, timeout=15) as r:
-        r.read()
+    if p.returncode != 0:
+        raise RuntimeError(p.stderr.strip() or f"curl exit {p.returncode}")
 
 def status(online: bool, last_id: int) -> dict:
     return {
