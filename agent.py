@@ -39,12 +39,21 @@ ALLOWED = [
 def allowed(cmd: str) -> bool:
     return any(p.match(cmd) for p in ALLOWED)
 
-def fetch_raw(file: str) -> str:
-    url = f"https://gist.githubusercontent.com/{OWNER}/{GIST_ID}/raw/{file}?t={time.time_ns()}"
-    return subprocess.check_output(
-        ["/usr/bin/curl", "-sS", "--max-time", "15", "-A", "remote-shell-demo-agent", url],
-        text=True,
+def fetch_file(file: str) -> str:
+    p = subprocess.run(
+        [
+            "/usr/bin/curl", "-sS", "--max-time", "15",
+            "-H", f"Authorization: Bearer {TOKEN}",
+            "-H", "Accept: application/vnd.github+json",
+            "-A", "remote-shell-demo-agent",
+            f"https://api.github.com/gists/{GIST_ID}?t={time.time_ns()}",
+        ],
+        text=True, capture_output=True,
     )
+    if p.returncode != 0:
+        raise RuntimeError(p.stderr.strip() or f"curl exit {p.returncode}")
+    data = json.loads(p.stdout)
+    return (data.get("files", {}).get(file, {}) or {}).get("content", "")
 
 def patch(files: dict) -> None:
     body = json.dumps({"files": files})
@@ -103,7 +112,7 @@ def main() -> int:
     write_status(True, last_id)
     while True:
         try:
-            raw = fetch_raw("command.json")
+            raw = fetch_file("command.json")
             try:
                 cmd = json.loads(raw)
             except Exception:

@@ -1,22 +1,30 @@
 const OWNER = process.env.GIST_OWNER || "dttk23100";
 const GIST_ID = process.env.GIST_ID;
 
-async function raw(file) {
-  const url = `https://gist.githubusercontent.com/${OWNER}/${GIST_ID}/raw/${file}?t=${Date.now()}`;
-  const r = await fetch(url, { cache: "no-store", headers: { "User-Agent": "remote-shell-demo" } });
-  if (!r.ok) throw new Error(`${file}: HTTP ${r.status}`);
-  return r.text();
+const TOKEN = process.env.GH_TOKEN;
+
+async function gistFiles() {
+  const r = await fetch(`https://api.github.com/gists/${GIST_ID}?t=${Date.now()}`, {
+    cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "remote-shell-demo",
+    },
+  });
+  if (!r.ok) throw new Error(`gist: HTTP ${r.status}`);
+  const data = await r.json();
+  return data.files || {};
 }
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store, max-age=0");
   if (!GIST_ID) return res.status(500).json({ error: "GIST_ID is not set" });
   try {
-    const [commandRaw, output, statusRaw] = await Promise.all([
-      raw("command.json"),
-      raw("output.txt"),
-      raw("status.json"),
-    ]);
+    const files = await gistFiles();
+    const commandRaw = files["command.json"]?.content || "{}";
+    const output = files["output.txt"]?.content || "";
+    const statusRaw = files["status.json"]?.content || "{}";
     let command = {};
     let status = {};
     try { command = JSON.parse(commandRaw); } catch (_) {}
