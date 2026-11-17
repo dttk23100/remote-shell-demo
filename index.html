@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REMOTE SHELL — public demo</title>
+<style>
+  :root{--bg:#05070b;--panel:#0b0f17;--line:#1d2a3d;--green:#42f58d;--dim:#6f8199;--red:#ff4b4b;--amber:#ffc857;--text:#d7e4f5}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -20%,#10251d 0,#05070b 45%,#030407);color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:28px}
+  .wrap{max-width:1050px;margin:0 auto}
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:20px;flex-wrap:wrap}
+  h1{font-size:clamp(1.5rem,3vw,2.2rem);margin:0;letter-spacing:-.04em;color:#fff}
+  h1 span{color:var(--green)}
+  .sub{color:var(--dim);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-top:6px}
+  .status{display:flex;align-items:center;gap:9px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#39465a;box-shadow:0 0 0 0 #42f58d00}
+  .dot.on{background:var(--green);box-shadow:0 0 12px #42f58d88;animation:pulse 2s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 7px #42f58d00}}
+  .grid{display:grid;grid-template-columns:1.55fr .9fr;gap:18px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .panel{border:1px solid var(--line);background:linear-gradient(180deg,#0b0f17f2,#070a10f2);box-shadow:0 20px 60px #0008}
+  .bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);color:var(--dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+  .bar i{width:8px;height:8px;border-radius:50%;background:#2d3a4c;display:inline-block}
+  .bar i:nth-child(1){background:#ff5f57}.bar i:nth-child(2){background:#febc2e}.bar i:nth-child(3){background:#28c840}
+  pre#out{margin:0;padding:16px 18px;min-height:360px;max-height:52vh;overflow:auto;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.65;color:#bfe9cf}
+  .meta{padding:12px 16px;border-top:1px solid var(--line);display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:11px;color:var(--dim)}
+  .meta b{color:#fff;font-weight:500}
+  .side{display:flex;flex-direction:column;gap:18px}
+  form{display:flex;gap:8px;padding:14px;border-top:1px solid var(--line)}
+  input{flex:1;min-width:0;background:#04070b;border:1px solid #26364c;color:#e8f4ff;padding:12px 13px;font:13px ui-monospace,Menlo,monospace;outline:none}
+  input:focus{border-color:var(--green);box-shadow:0 0 0 2px #42f58d18}
+  button{background:var(--green);border:1px solid var(--green);color:#031008;padding:11px 16px;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+  button:hover{filter:brightness(1.08)}button:disabled{opacity:.45;cursor:not-allowed}
+  .quick{padding:14px;display:flex;flex-wrap:wrap;gap:8px;border-top:1px solid var(--line)}
+  .quick button{background:#0d1722;color:#bcd2e8;border-color:#26364c;padding:8px 10px;font-weight:500;letter-spacing:.04em;text-transform:none}
+  .quick button:hover{border-color:var(--green);color:#fff}
+  .note{padding:14px 16px;color:var(--dim);font-size:10px;line-height:1.8;border-top:1px solid var(--line)}
+  .note b{color:var(--amber);font-weight:500}
+  .cmdline{padding:12px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);min-height:42px}
+  .cmdline b{color:#fff;font-weight:500}
+  .err{color:var(--red)}
+  .ok{color:var(--green)}
+  a{color:var(--green)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>REMOTE <span>SHELL</span></h1>
+      <div class="sub">public demo · c2 over github gist · consenting test host</div>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="state">waiting for agent</span></div>
+  </header>
+
+  <div class="grid">
+    <section class="panel">
+      <div class="bar"><i></i><i></i><i></i><span style="margin-left:8px">operator@c2 — live session</span></div>
+      <pre id="out">connecting…</pre>
+      <div class="cmdline" id="cmdline">last command: <b>—</b></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="bar">session info</div>
+        <div class="meta">
+          <span>host</span><b id="host">—</b>
+          <span>user</span><b id="user">—</b>
+          <span>last seen</span><b id="seen">—</b>
+          <span>last id</span><b id="lastid">—</b>
+        </div>
+        <form id="form">
+          <input id="cmd" autocomplete="off" spellcheck="false" placeholder="whoami" aria-label="command">
+          <button id="send" type="submit">run</button>
+        </form>
+        <div class="quick">
+          <button data-cmd="whoami">whoami</button>
+          <button data-cmd="hostname">hostname</button>
+          <button data-cmd="uname -a">uname -a</button>
+          <button data-cmd="sw_vers">sw_vers</button>
+          <button data-cmd="pwd">pwd</button>
+          <button data-cmd="ls -la">ls -la</button>
+          <button data-cmd="date">date</button>
+          <button data-cmd="uptime">uptime</button>
+        </div>
+        <div class="note">
+          <b>Read-only allowlist.</b> This public demo runs on a consenting macOS host.
+          Allowed: whoami, id, hostname, pwd, date, uptime, uname, sw_vers, df, ls, ps, echo, say.
+          No writes, no sudo, no network commands.
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const out = $('#out'), dot = $('#dot'), state = $('#state');
+  let lastCmd = 0;
+  let seenTimer = 0;
+
+  function ago(ts) {
+    if (!ts) return '—';
+    const s = Math.max(0, Math.floor(Date.now()/1000 - ts));
+    if (s < 3) return 'just now';
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    return Math.floor(s/3600) + 'h ago';
+  }
+
+  async function tick() {
+    try {
+      const r = await fetch('/api/state?t=' + Date.now(), {cache:'no-store'});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+      const st = d.status || {};
+      const online = st.last_seen && (Date.now()/1000 - st.last_seen) < 15;
+      dot.classList.toggle('on', !!online);
+      state.textContent = online ? 'agent online' : 'agent offline';
+      $('#host').textContent = st.host || '—';
+      $('#user').textContent = st.user || '—';
+      $('#seen').textContent = ago(st.last_seen);
+      $('#lastid').textContent = st.last_id || '—';
+      const cmd = d.command || {};
+      if (cmd.cmd) {
+        $('#cmdline').innerHTML = 'last command: <b></b>';
+        $('#cmdline b').textContent = cmd.cmd;
+      }
+      out.textContent = d.output || 'waiting for agent…';
+      out.scrollTop = out.scrollHeight;
+      state.classList.remove('err');
+    } catch (e) {
+      dot.classList.remove('on');
+      state.textContent = 'dashboard error';
+      state.classList.add('err');
+      out.textContent = 'state error: ' + e.message;
+    }
+  }
+
+  async function run(cmd) {
+    cmd = (cmd || '').trim();
+    if (!cmd) return;
+    $('#send').disabled = true;
+    try {
+      const r = await fetch('/api/command', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({cmd})
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+      out.textContent = '$ ' + cmd + '\n\nsent · waiting for agent…';
+      lastCmd = d.id;
+    } catch (e) {
+      out.textContent = 'send error: ' + e.message;
+    } finally {
+      $('#send').disabled = false;
+      $('#cmd').value = '';
+      $('#cmd').focus();
+    }
+  }
+
+  $('#form').addEventListener('submit', (e) => { e.preventDefault(); run($('#cmd').value); });
+  document.querySelectorAll('.quick button').forEach(b => b.addEventListener('click', () => run(b.dataset.cmd)));
+  tick();
+  setInterval(tick, 1500);
+</script>
+</body>
+</html>
