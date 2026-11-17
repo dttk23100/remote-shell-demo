@@ -18,7 +18,7 @@ OWNER = os.environ.get("GIST_OWNER", "dttk23100")
 GIST_ID = os.environ["GIST_ID"]
 TOKEN = os.environ["GH_TOKEN"]
 INTERVAL = float(os.environ.get("INTERVAL", "1.5"))
-HEARTBEAT = 10.0
+HEARTBEAT = 5.0
 
 ALLOWED = [
     re.compile(r"^whoami$"),
